@@ -60,7 +60,7 @@ def sort_mask_in_pow_order(image):
     size_y = img.shape[1]
     reconstructed_img_hadamard = np.zeros([size_x, size_y])
 
-    for i in tqdm(range(0, size_x)):
+    ''' for i in tqdm(range(0, size_x)):
         for j in range(0, size_y):
             reconstructed_img_hadamard[i][j] = float(make_reconstruction_coeff(image, i, j) / float(size_x * size_y))
     
@@ -68,22 +68,25 @@ def sort_mask_in_pow_order(image):
     # ex) 256x256 array의 [131, 11] index에 해당하는 element가 4번째로 큰 값을 가질 경우 pow_sorted_idx[3] = [131, 11]이 저장된다.
     pow_sorted_idx = np.column_stack(np.unravel_index(np.argsort((-np.abs(reconstructed_img_hadamard)).ravel()),
                                                       reconstructed_img_hadamard.shape))
-    # /patterns/(이미지 크기)_pow_sorted 폴더 생성
+    # /patterns/(이미지 크기)_pow_sorted 폴더 생성'''
+    # Mask pattern image 폴더 전체를 복사한 뒤 파일들의 이름을 바꾸는 식으로 진행된다.
     # 이 폴더에 이미지가 intensity가 큰 순서대로 번호를 부여받아 저장된다.
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    par_script_dir = os.path.dirname(script_dir)
-    pattern_original_dir_path = par_script_dir + "/" + str(img_size_x) + "x" + str(img_size_y)
-    pattern_pow_sorted_dir_path = par_script_dir + '/' + str(img_size_x) + "x" + str(img_size_y) + '_pow_sorted'
+    pattern_original_dir_path = script_dir + "/patterns/" + str(img_size_x) + "x" + str(img_size_y)
+    pattern_pow_sorted_dir_path = script_dir + "/patterns/" + str(img_size_x) + "x" + str(img_size_y) + '_pow_sorted'
 
     # pow_sorted_idx matrix 정보를 /patterns/(이미지 크기) 폴더에 저장
     # 이후 pow order mode로 reconstruction할 때 불러와서 활용된다.
-    np.save('./np_pow_sorted_idx', pow_sorted_idx)
-    copy_tree(pattern_original_dir_path, pattern_pow_sorted_dir_path)
-    for i in tqdm(range(0, size_x*size_y)):
-        mask1_name = script_dir+"/"+str(pow_sorted_idx[i][0]) + "_" + str(pow_sorted_idx[i][1]) + "_+.png"
-        mask2_name = script_dir+"/"+str(pow_sorted_idx[i][0]) + "_" + str(pow_sorted_idx[i][1]) + "_+.png"
-        os.rename(mask1_name, str(i) + "_+.png")
-        os.rename(mask2_name, str(i) + "_-.png")
+    # np.save('pattern_original_dir_path + '/np_pow_sorted_idx', pow_sorted_idx)
+    pow_sorted_idx = np.load('./np_pow_sorted_idx.npy')
+    # copy_tree(pattern_original_dir_path, pattern_pow_sorted_dir_path)
+
+    # Sorted order에 맞춰 복사된 파일들의 이름을 바꾼다
+    for i in range(0, size_x*size_y):
+        mask1_path = pattern_pow_sorted_dir_path + '/' + str(pow_sorted_idx[i][0]) + "_" + str(pow_sorted_idx[i][1]) + "_+.png"
+        mask2_path = pattern_pow_sorted_dir_path + '/' + str(pow_sorted_idx[i][0]) + "_" + str(pow_sorted_idx[i][1]) + "_-.png"
+        os.rename(mask1_path, pattern_pow_sorted_dir_path + '/' + str(i) + "_+.png")
+        os.rename(mask2_path, pattern_pow_sorted_dir_path + '/' + str(i) + "_-.png")
 
 
 # 2D Hadamard reconstruction
@@ -102,7 +105,7 @@ def hadamard_reconstruction_pow_order_frac(image, frac):
     size_x = img.shape[0]; size_y = img.shape[1]
     reconstructed_img_hadamard = np.zeros([size_x, size_y])
 
-    pow_sorted_idx = np.load('./np_pow_sorted_idx.npy').copy()
+    pow_sorted_idx = np.load('./np_pow_sorted_idx.npy')
     sampling_max = int(frac*size_x*size_y)
     # idxs = [pow_sorted_idx[i] for i in range(0, sampling_max)]
     for i in range(0, sampling_max):
@@ -119,7 +122,7 @@ img = cv2.imdecode(img_arr, cv2.IMREAD_GRAYSCALE)
 img_size_x = img.shape[0]
 img_size_y = img.shape[1]
 
-if math.log2(img_size_x) % 2 != 0 or math.log2(img_size_y) % 2 != 0:
+if not float.is_integer(math.log2(img_size_x)) or not float.is_integer(math.log2(img_size_y)):
     print("Wrong Image size")
 
 else:
@@ -140,7 +143,7 @@ else:
             print("CC 추가 예정")
         else:
             # 이미지 reconstruction
-            img_reconstructed = hadamard_reconstruction_pow_order_frac(img, 0.35)
+            img_reconstructed = hadamard_reconstruction_pow_order_frac(img, 0.4)
             # 다시 원래 작업 위치로 돌아와 파일 저장
             os.chdir(script_path)
             cv2.imshow("img", img)
