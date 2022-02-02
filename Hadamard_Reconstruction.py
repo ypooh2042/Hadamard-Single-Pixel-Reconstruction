@@ -69,7 +69,7 @@ def get_num_of_chunk(i, j):
 
     # y CC order 계산
     while y < mask.shape[1]-1:
-        if(mask[x][y] != mask[x][y+1] and x < mask.shape[0]-1):
+        if(mask[x][y] != mask[x][y+1] and y < mask.shape[0]-1):
             cc_order_y += 1
         y += 1
 
@@ -154,7 +154,6 @@ def sort_masks_in_pow_order(image):
 
 def sort_masks_in_cc_order(mask_shape):
     size_x = mask_shape[0]; size_y = mask_shape[1]
-
     # Multithread support
     p = Pool()
 
@@ -171,9 +170,9 @@ def sort_masks_in_cc_order(mask_shape):
 
     # cc_orders_of_masks를 pow에 따라 내림차순 정렬할 때의 index를 정의
     # ex) 256x256 array의 [131, 11] index에 해당하는 element가 4번째로 큰 값을 가질 경우 CC_sorted_idx[3] = [131, 11]이 저장된다.
-    CC_sorted_idx = np.column_stack(np.unravel_index(np.argsort((-np.abs(cc_orders_of_masks)).ravel()),
+    CC_sorted_idx = np.column_stack(np.unravel_index(np.argsort((cc_orders_of_masks).ravel()),
                                                       cc_orders_of_masks.shape))
-
+    print(np.argsort((cc_orders_of_masks).ravel()))
     # CC_sorted_idx matrix 정보를 /patterns/(이미지 크기) 폴더에 저장
     # 이후 CC order mode로 reconstruction할 때 불러와서 활용된다.
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -271,7 +270,7 @@ if __name__=="__main__":
 
     # 이미지 읽어오기
     script_path = os.path.dirname(os.path.abspath(__file__))
-    img_arr = np.fromfile(script_path+'\16x16.png', np.uint8)
+    img_arr = np.fromfile(script_path+'\\16x16.png', np.uint8)
     img = cv2.imdecode(img_arr, cv2.IMREAD_GRAYSCALE)
     img_size_x = img.shape[0]
     img_size_y = img.shape[1]
@@ -297,15 +296,15 @@ if __name__=="__main__":
 
         # 작업 선택
         print("할 작업을 고르세요")
-        print("1 : Sort masks in power order\n2 : Sort masks in CC order\nother : Reconstruct Image")
+        print("1 : Sort masks in power order\n2 : Sort masks in CC order\n3 : Reconstruct Image\nother : 종료")
         usr_input = input("숫자를 입력하세요: ")
         print("\n\n")
         if int(usr_input) == 1:
             sort_masks_in_pow_order(img)
         elif int(usr_input) == 2:
-            print("CC 추가 예정")
-        else:
-            print("1 : Power order reconstruction\n2 : CC order reconstruction\nother : Complete reconstruction")
+            sort_masks_in_cc_order(img.shape)
+        elif int(usr_input) == 3:
+            print("1 : Power order reconstruction\n2 : CC order reconstruction\n3 : Complete reconstruction\nother : 종료")
             print("\n주의!: power order reconstruction의 경우 해당 이미지에 대한 power order가 저장된 numpy파일이 있어야 합니다.\
                 저장된 numpy파일이 없을 경우 Sort masks in power order를 실행해 파일을 생성해주세요.")
             # 이미지 reconstruction
@@ -320,11 +319,14 @@ if __name__=="__main__":
                 
             elif int(usr_input) == 2:
                 print("CC 추가 예정")
+                terminated = True
 
-            else:
+            elif int(usr_input) == 3:
                 img_reconstructed = hadamard_complete_reconstruction(img)
                 terminated = True
             
+            else : 
+                break
             # 다시 원래 작업 위치로 돌아와 파일 저장
             os.chdir(script_path)
             cv2.imshow("img", img)
@@ -332,5 +334,7 @@ if __name__=="__main__":
             cv2.imwrite("reconstructed_img.png", img_reconstructed)
             cv2.waitKey
             cv2.destroyAllWindows
+        else :
+            break
 
                         
