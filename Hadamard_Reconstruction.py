@@ -257,9 +257,6 @@ def hadamard_reconstruction_pow_order(image, frac):
     for i in range(0, sampling_max):
         reconstructed_img_hadamard[pow_sorted_idx[i][0]][pow_sorted_idx[i][1]] = tmp[i]
 
-    # starmap의 결과는 1차원 배열로 나오기 때문에 2d array로 다시 변환해 준다.
-    reconstructed_img_hadamard = np.reshape(reconstructed_img_hadamard, (-1, size_x))
-
     # 이 결과에 Inverse Hadamard transform을 하여 복원된 이미지를 얻는다.
     reconstructed_img = np.array(hadamard_2d_transform_inv(reconstructed_img_hadamard), dtype=np.uint8)
     t2 = time.time()
@@ -289,9 +286,6 @@ def hadamard_reconstruction_cc_order(image, frac):
     # 그러므로 사용한 mask에 해당하는 index에는 starmap의 결과를 채워주고, 아닌 경우엔 0인 상태로 놔둔다.
     for i in range(0, sampling_max):
         reconstructed_img_hadamard[cc_sorted_idx[i][0]][cc_sorted_idx[i][1]] = tmp[i]
-
-    # starmap의 결과는 1차원 배열로 나오기 때문에 2d array로 다시 변환해 준다.
-    reconstructed_img_hadamard = np.reshape(reconstructed_img_hadamard, (-1, size_x))
 
     # 이 결과에 Inverse Hadamard transform을 하여 복원된 이미지를 얻는다.
     reconstructed_img = np.array(hadamard_2d_transform_inv(reconstructed_img_hadamard), dtype=np.uint8)
