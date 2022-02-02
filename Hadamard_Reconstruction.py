@@ -305,8 +305,8 @@ if __name__=="__main__":
             sort_masks_in_cc_order(img.shape)
         elif int(usr_input) == 3:
             print("1 : Power order reconstruction\n2 : CC order reconstruction\n3 : Complete reconstruction\nother : 종료")
-            print("\n주의!: power order reconstruction의 경우 해당 이미지에 대한 power order가 저장된 numpy파일이 있어야 합니다.\
-                저장된 numpy파일이 없을 경우 Sort masks in power order를 실행해 파일을 생성해주세요.")
+            print("\n주의!: power order reconstruction의 경우 해당 이미지에 대한 power order가 저장된 numpy파일이 있어야 합니다.")
+            print("저장된 numpy파일이 없을 경우 Sort masks in power order를 실행해 파일을 생성해주세요.")
             # 이미지 reconstruction
             usr_input = input("숫자를 입력하세요: ")
             if int(usr_input) == 1:
