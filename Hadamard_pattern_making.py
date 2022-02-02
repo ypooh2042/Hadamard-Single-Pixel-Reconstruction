@@ -29,9 +29,11 @@ def hadamard_matrix(n):
 # 2D 하다마드 변환
 # return의 result 뒤에 붙는 pow는 hadamard transform의 coefficient
 def hadamard_2d_transform(mat):
+    size_x = mat.shape[0]
+    size_y = mat.shape[1]
     result = ffht.fht(mat).transpose().copy()
     result = np.transpose(ffht.fht(result))
-    return result * pow(2, -exp_x) * pow(2, -exp_y)
+    return result * pow(2, -size_x) * pow(2, -size_y)
 
 
 # 2D 하다마드 역변환

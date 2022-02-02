@@ -21,11 +21,6 @@ def count_number_of_1(num):
     return cnt
 
 
-# 파일 복사 (멀티스레드 연산용 함수)
-def copy_file(path):
-    shutil.copy2(path[0], path[1])
-
-
 # 하다마드 행렬 H_n 생성
 def hadamard_matrix(n):
     # Use a breakpoint in the code line below to debug your script.
@@ -48,26 +43,60 @@ def hadamard_2d_transform_inv(mat):
     return result
 
 
+# 파일 복사 (멀티스레드 연산용 함수)
+def copy_file(path):
+    shutil.copy2(path[0], path[1])
+
+
+# Mask의 CC number를 계산
+def get_num_of_chunk(i, j):
+    # 주어진 basis에 해당하는 mask 파일 이름
+    # +와 -는 CC number가 동일하기 때문에 +만 불러와서 계산해도 상관이 없다!
+    mask_name = str(i) + "_" + str(j) + "_+.png"
+
+    # 패턴을 폴더에서 불러온다.
+    mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE)
+
+    x = 0; y = 0
+    cc_order_x = 1; cc_order_y = 1
+    terminated = False
+
+    # x CC order 계산
+    while x < mask.shape[0]-1:
+        if(mask[x][y] != mask[x+1][y] and x < mask.shape[0]-1):
+            cc_order_x += 1
+        x += 1
+
+    # y CC order 계산
+    while y < mask.shape[1]-1:
+        if(mask[x][y] != mask[x][y+1] and x < mask.shape[0]-1):
+            cc_order_y += 1
+        y += 1
+
+    return cc_order_x*cc_order_y
+
+
+# Reconstruction Coefficient 측정 (Single-pixel power 측정)
 def make_reconstruction_coeff(image, i, j) :
-        # 주어진 basis에 해당하는 mask 파일 이름
-        mask1_name = str(i) + "_" + str(j) + "_+.png"
-        mask2_name = str(i) + "_" + str(j) + "_-.png"
+    # 주어진 basis에 해당하는 mask 파일 이름
+    mask1_name = str(i) + "_" + str(j) + "_+.png"
+    mask2_name = str(i) + "_" + str(j) + "_-.png"
 
-        # 패턴을 폴더에서 불러와 읽은 이미지에 적용한다.
-        mask1 = cv2.imread(mask1_name, cv2.IMREAD_GRAYSCALE)
-        mask2 = cv2.imread(mask2_name, cv2.IMREAD_GRAYSCALE)
-        img_reflected_1 = np.array(image * (mask1 / 255), dtype=np.uint8)
-        img_reflected_2 = np.array(image * (mask2 / 255), dtype=np.uint8)
+    # 패턴을 폴더에서 불러와 읽은 이미지에 적용한다.
+    mask1 = cv2.imread(mask1_name, cv2.IMREAD_GRAYSCALE)
+    mask2 = cv2.imread(mask2_name, cv2.IMREAD_GRAYSCALE)
+    img_reflected_1 = np.array(image * (mask1 / 255), dtype=np.uint8)
+    img_reflected_2 = np.array(image * (mask2 / 255), dtype=np.uint8)
 
-        # 측정되는 intensity를 연산해 reconstructed image의 coefficient를 구한다.
-        intensity_1 = np.sum(img_reflected_1.astype(dtype=np.int32), dtype=np.int32)
-        intensity_2 = np.sum(img_reflected_2.astype(dtype=np.int32), dtype=np.int32)
+    # 측정되는 intensity를 연산해 reconstructed image의 coefficient를 구한다.
+    intensity_1 = np.sum(img_reflected_1.astype(dtype=np.int32), dtype=np.int32)
+    intensity_2 = np.sum(img_reflected_2.astype(dtype=np.int32), dtype=np.int32)
 
-        return float(intensity_1-intensity_2) / float(image.shape[0] * image.shape[1])
+    return float(intensity_1-intensity_2) / float(image.shape[0] * image.shape[1])
 
 
 # Sort mask in power order
-def sort_mask_in_pow_order(image):
+def sort_masks_in_pow_order(image):
     size_x = image.shape[0]; size_y = image.shape[1]
 
     # Multithread support
@@ -121,6 +150,63 @@ def sort_mask_in_pow_order(image):
     p.join
     t2 = time.time()
     print("Sorted mask file 복사 완료! 파일 복사에 걸린 시간 : {time}", t2-t1)
+
+
+def sort_masks_in_cc_order(mask_shape):
+    size_x = mask_shape[0]; size_y = mask_shape[1]
+
+    # Multithread support
+    p = Pool()
+
+    # Mask들의 CC order를 구한다
+    # CC order 값을 이용해 mask를 정렬해야함!
+    print("CC order 분석 중...")
+    t1 = time.time()
+    cc_orders_of_masks = p.starmap(get_num_of_chunk, [(i, j) for i in range(0, size_x) for j in range(0, size_y)])
+    p.close
+    p.join
+
+    # starmap의 결과는 1차원 배열로 나오기 때문에 2d array로 다시 변환해 준다.
+    cc_orders_of_masks = np.reshape(cc_orders_of_masks, (-1, size_x))
+
+    # cc_orders_of_masks를 pow에 따라 내림차순 정렬할 때의 index를 정의
+    # ex) 256x256 array의 [131, 11] index에 해당하는 element가 4번째로 큰 값을 가질 경우 CC_sorted_idx[3] = [131, 11]이 저장된다.
+    CC_sorted_idx = np.column_stack(np.unravel_index(np.argsort((-np.abs(cc_orders_of_masks)).ravel()),
+                                                      cc_orders_of_masks.shape))
+
+    # CC_sorted_idx matrix 정보를 /patterns/(이미지 크기) 폴더에 저장
+    # 이후 CC order mode로 reconstruction할 때 불러와서 활용된다.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pattern_original_dir_path = script_dir + "/patterns/" + str(img_size_x) + "x" + str(img_size_y)
+    np.save(pattern_original_dir_path + '/np_CC_sorted_idx', CC_sorted_idx)
+    t2 = time.time()
+    print("CC order 분석 완료! 분석에 걸린 시간 : ", t2-t1)
+
+    # /patterns/(이미지 크기)_CC_sorted 폴더 생성
+    # Sorted mask pattern이 저장되는 폴더
+    # 이 폴더에 이미지가 CC order가 큰 순서대로 번호를 부여받아 저장된다.
+    pattern_CC_sorted_dir_path = script_dir + "/patterns/" + str(img_size_x) + "x" + str(img_size_y) + '_CC_sorted'
+    os.makedirs(pattern_CC_sorted_dir_path, exist_ok=True)
+
+    CC_sorted_idx = np.load('./np_CC_sorted_idx.npy')
+
+    # 옮겨갈 파일의 새로운 이름을 pow_sorted_idx에 따라 숫자를 부여해 나타낸다.
+    # ex) 5_+.png -> 5번째로 intensity가 크게 나오는 mask 중 +mask
+    mask1_path_lst = [[pattern_original_dir_path + '/' + str(a[0]) + "_" + str(a[1]) + "_+.png",\
+         pattern_CC_sorted_dir_path + '/' + str(i) + "_+.png"] for i, a in enumerate(CC_sorted_idx)]
+    mask2_path_lst = [[pattern_original_dir_path + '/' + str(a[0]) + "_" + str(a[1]) + "_-.png",\
+         pattern_CC_sorted_dir_path + '/' + str(i) + "_-.png"] for i, a in enumerate(CC_sorted_idx)]
+
+    # Mask 파일을 복사하고 이름을 바꾸어 다른 폴더에 저장
+    print("Sorted mask file 저장 중...")
+    t1 = time.time()
+    p.map(copy_file, mask1_path_lst)
+    p.map(copy_file, mask2_path_lst)
+    p.close
+    p.join
+    t2 = time.time()
+    print("Sorted mask file 복사 완료! 파일 복사에 걸린 시간 : {time}", t2-t1)
+
 
 
 # 2D Hadamard reconstruction
@@ -215,7 +301,7 @@ if __name__=="__main__":
         usr_input = input("숫자를 입력하세요: ")
         print("\n\n")
         if int(usr_input) == 1:
-            sort_mask_in_pow_order(img)
+            sort_masks_in_pow_order(img)
         elif int(usr_input) == 2:
             print("CC 추가 예정")
         else:
