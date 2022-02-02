@@ -172,7 +172,7 @@ def sort_masks_in_cc_order(mask_shape):
     # ex) 256x256 array의 [131, 11] index에 해당하는 element가 4번째로 큰 값을 가질 경우 CC_sorted_idx[3] = [131, 11]이 저장된다.
     CC_sorted_idx = np.column_stack(np.unravel_index(np.argsort((cc_orders_of_masks).ravel()),
                                                       cc_orders_of_masks.shape))
-    print(np.argsort((cc_orders_of_masks).ravel()))
+
     # CC_sorted_idx matrix 정보를 /patterns/(이미지 크기) 폴더에 저장
     # 이후 CC order mode로 reconstruction할 때 불러와서 활용된다.
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -235,7 +235,7 @@ def hadamard_complete_reconstruction(image):
 
 
 # Power ordering을 이용해 Masking pattern의 일부만을 사용하여 이미지를 복원하는 함수
-def hadamard_reconstruction_pow_order_frac(image, frac):
+def hadamard_reconstruction_pow_order(image, frac):
     size_x = image.shape[0]; size_y = image.shape[1]
     reconstructed_img_hadamard = np.zeros([size_x, size_y])
 
@@ -265,6 +265,41 @@ def hadamard_reconstruction_pow_order_frac(image, frac):
     t2 = time.time()
     print("Reconstruction 완료! Reconstruction에 걸린 시간 : ", t2-t1)
     return reconstructed_img
+
+
+# CC ordering을 이용해 Masking pattern의 일부만을 사용하여 이미지를 복원하는 함수
+def hadamard_reconstruction_cc_order(image, frac):
+    size_x = image.shape[0]; size_y = image.shape[1]
+    reconstructed_img_hadamard = np.zeros([size_x, size_y])
+
+    # CC sorted index 정보가 들어있는 numpy를 로드한다.
+    # 해당 파일이 존재하지 않을 경우 오류를 내므로 주의
+    cc_sorted_idx = np.load('./np_CC_sorted_idx.npy')
+    sampling_max = int(frac*size_x*size_y)
+    
+    # Multithread support
+    p = Pool()
+    print("Reconstruction 중...")
+    t1 = time.time()
+    tmp = p.starmap(make_reconstruction_coeff, [(image, cc_sorted_idx[i][0], cc_sorted_idx[i][1]) for i in range(0, sampling_max)])
+    p.close
+    p.join
+
+    # 이 경우 Masking pattern의 일부만을 사용해 이미지를 복원하기 때문에 starmap의 결과는 일부만 있는 상태이다.
+    # 그러므로 사용한 mask에 해당하는 index에는 starmap의 결과를 채워주고, 아닌 경우엔 0인 상태로 놔둔다.
+    for i in range(0, sampling_max):
+        reconstructed_img_hadamard[cc_sorted_idx[i][0]][cc_sorted_idx[i][1]] = tmp[i]
+
+    # starmap의 결과는 1차원 배열로 나오기 때문에 2d array로 다시 변환해 준다.
+    reconstructed_img_hadamard = np.reshape(reconstructed_img_hadamard, (-1, size_x))
+
+    # 이 결과에 Inverse Hadamard transform을 하여 복원된 이미지를 얻는다.
+    reconstructed_img = np.array(hadamard_2d_transform_inv(reconstructed_img_hadamard), dtype=np.uint8)
+    t2 = time.time()
+    print("Reconstruction 완료! Reconstruction에 걸린 시간 : ", t2-t1)
+
+    return reconstructed_img
+
 
 if __name__=="__main__":
 
@@ -314,11 +349,15 @@ if __name__=="__main__":
                 if float(usr_input) <= 0 or float(usr_input) > 1 :
                     print("Wrong Input")
                     break
-                img_reconstructed = hadamard_reconstruction_pow_order_frac(img, float(usr_input))
+                img_reconstructed = hadamard_reconstruction_pow_order(img, float(usr_input))
                 terminated = True
                 
             elif int(usr_input) == 2:
-                print("CC 추가 예정")
+                usr_input = input("Sampling ratio를 설정하세요: ")
+                if float(usr_input) <= 0 or float(usr_input) > 1 :
+                    print("Wrong Input")
+                    break
+                img_reconstructed = hadamard_reconstruction_cc_order(img, float(usr_input))
                 terminated = True
 
             elif int(usr_input) == 3:
