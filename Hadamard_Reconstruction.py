@@ -271,7 +271,7 @@ if __name__=="__main__":
 
     # 이미지 읽어오기
     script_path = os.path.dirname(os.path.abspath(__file__))
-    img_arr = np.fromfile(script_path+'\original.png', np.uint8)
+    img_arr = np.fromfile(script_path+'\16x16.png', np.uint8)
     img = cv2.imdecode(img_arr, cv2.IMREAD_GRAYSCALE)
     img_size_x = img.shape[0]
     img_size_y = img.shape[1]
